@@ -120,10 +120,12 @@ function printInstallFailedWarning(): void {
 
 function isLarkCliInstalled(): boolean {
   try {
-    const result = spawnSync('lark-cli', ['--version'], {
-      stdio: ['ignore', 'ignore', 'ignore'],
-      shell: process.platform === 'win32',
-    });
+    const onWin = process.platform === 'win32';
+    const result = spawnSync(
+      onWin ? 'cmd' : 'lark-cli',
+      onWin ? ['/c', 'lark-cli --version'] : ['--version'],
+      { stdio: ['ignore', 'ignore', 'ignore'] },
+    );
     return result.status === 0;
   } catch {
     return false;
@@ -146,14 +148,17 @@ async function runCapture(
   args: string[],
   timeoutMs: number,
 ): Promise<RunResult> {
-  const onWindows = process.platform === 'win32';
+  const onWin = process.platform === 'win32';
+  // On Windows use cmd /c to avoid shell:true deprecation and .cmd execution issues.
+  const [spawnCmd, spawnArgs] = onWin
+    ? ['cmd', ['/c', `${cmd} ${args.join(' ')}`]]
+    : [cmd, args];
   let captured = '';
   let timedOut = false;
 
   const exitCode = await new Promise<number | null>((resolve) => {
-    const child = spawn(cmd, args, {
+    const child = spawn(spawnCmd, spawnArgs, {
       stdio: ['ignore', 'pipe', 'pipe'],
-      shell: onWindows,
     });
     child.stdout?.on('data', (b: Buffer) => {
       captured += b.toString('utf8');

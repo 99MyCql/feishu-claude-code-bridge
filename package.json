@@ -24,7 +24,6 @@
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "prepare": "tsup",
     "prepublishOnly": "pnpm typecheck && pnpm build"
   },
   "dependencies": {

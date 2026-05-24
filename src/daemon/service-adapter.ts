@@ -127,7 +127,13 @@ function makeSchtasksAdapter(): ServiceAdapter {
     servicePath: () => WINDOWS_TASK_NAME,
     install: async () => {
       const r = await schtasks.installTask();
-      if (!r.ok) throw new Error(r.stderr || 'schtasks /Create failed');
+      if (!r.ok) {
+        const detail = r.stderr.trim();
+        if (/access is denied/i.test(detail)) {
+          throw new Error('需要管理员权限才能注册计划任务。请以管理员身份运行终端，然后重试。');
+        }
+        throw new Error(detail || 'schtasks /Create failed');
+      }
     },
     start: schtasks.runTask,
     stop: schtasks.endTask,

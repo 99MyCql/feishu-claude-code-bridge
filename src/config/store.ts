@@ -1,4 +1,4 @@
-import { chmod, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { paths } from './paths';
 import type { AppConfig, AppPreferences, TenantBrand } from './schema';
@@ -106,6 +106,10 @@ export async function ensureSecretsGetterWrapper(): Promise<string> {
   if (!isWin) {
     await chmod(tmp, 0o700);
   }
+  // Windows rename fails if destination exists (unlike POSIX atomic replace).
+  if (isWin) {
+    try { await unlink(wrapperPath); } catch { /* didn't exist */ }
+  }
   await rename(tmp, wrapperPath);
   return wrapperPath;
 }
@@ -116,6 +120,11 @@ export async function saveConfig(cfg: AppConfig, path: string = paths.configFile
   await writeFile(tmp, `${JSON.stringify(cfg, null, 2)}\n`, 'utf8');
   // chmod the temp file before rename, so the destination path is never
   // visible with default permissions.
-  await chmod(tmp, 0o600);
+  if (process.platform !== 'win32') {
+    await chmod(tmp, 0o600);
+  } else {
+    // Windows rename fails if destination exists.
+    try { await unlink(path); } catch { /* didn't exist */ }
+  }
   await rename(tmp, path);
 }
