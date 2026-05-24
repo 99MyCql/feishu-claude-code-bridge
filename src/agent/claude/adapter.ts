@@ -1,10 +1,22 @@
 import type { ChildProcessByStdio } from 'node:child_process';
-import { spawn } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import type { Readable } from 'node:stream';
+import { join } from 'node:path';
 import { log } from '../../core/logger';
 import type { AgentAdapter, AgentEvent, AgentRun, AgentRunOptions } from '../types';
 import { translateEvent } from './stream-json';
+
+function resolveBinary(name: string): string {
+  if (process.platform !== 'win32') return name;
+  try {
+    const npmRoot = execSync('npm root -g', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const exe = join(npmRoot, '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
+    return exe;
+  } catch {
+    return name;
+  }
+}
 
 export interface ClaudeAdapterOptions {
   binary?: string;
@@ -108,12 +120,14 @@ export class ClaudeAdapter implements AgentAdapter {
   private readonly binary: string;
 
   constructor(opts: ClaudeAdapterOptions = {}) {
-    this.binary = opts.binary ?? 'claude';
+    this.binary = resolveBinary(opts.binary ?? 'claude');
   }
 
   async isAvailable(): Promise<boolean> {
     return new Promise((resolve) => {
-      const child = spawn(this.binary, ['--version'], { stdio: 'ignore' });
+      const child = spawn(this.binary, ['--version'], {
+        stdio: 'ignore',
+      });
       child.on('error', () => resolve(false));
       child.on('exit', (code) => resolve(code === 0));
     });
